@@ -7,18 +7,19 @@ extern crate rand;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
+extern crate chrono;
 extern crate serde_json;
 extern crate serde_yaml;
-extern crate chrono;
 
 use std::io;
 
 use avro_rs::Codec;
+use uuid::Uuid;
 
 use crate::errors::DataGenResult;
 use crate::schema::Schema;
-use crate::sinks::{avro_sink, csv_sink, json_sink, Sink};
 use crate::sinks::avro_schema_utils::to_avro_schema;
+use crate::sinks::{avro_sink, csv_sink, json_sink, Sink};
 
 pub mod errors;
 pub mod fakegen;
@@ -43,6 +44,7 @@ pub enum DValue {
     Date(String),
     DateTime(String),
     Record(Vec<(String, DValue)>),
+    Uuid(String),
 }
 
 #[derive(Debug, PartialEq, Deserialize, Serialize, Clone)]
@@ -62,7 +64,7 @@ pub enum DType {
     DateTime,
     Latitude,
     Longitude,
-
+    Uuid,
     //TODO - For now, let's stick to basic types
     //    Date, Array, Map, Nullable (union/null), Record,
 }
@@ -138,7 +140,8 @@ mod tests {
             "./test_data/schema_simple.yaml".to_string(),
             100,
             ',' as u8,
-        ).unwrap();
+        )
+        .unwrap();
 
         let read_file = File::open(output_path).expect("Output File Path not found");
         let reader = BufReader::new(read_file);
@@ -174,7 +177,7 @@ mod tests {
         let value: Value = serde_json::from_reader(reader).unwrap();
         match value {
             Value::Array(vec) => assert_eq!(vec.len(), 100),
-            _ => panic!("Unable to parse JSON as an array")
+            _ => panic!("Unable to parse JSON as an array"),
         }
     }
 }

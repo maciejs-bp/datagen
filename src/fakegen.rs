@@ -1,17 +1,18 @@
-use fake::Faker;
+use chrono::prelude::*;
 use fake::faker::address::en::*;
 use fake::faker::chrono::en::*;
 use fake::faker::lorem::en::*;
 use fake::faker::name::en::*;
 use fake::faker::phone_number::en::*;
 use fake::locales::EN;
+use fake::Faker;
 use rand::Rng;
 use rand_distr::{Distribution, Normal, Uniform};
-use chrono::prelude::*;
+use uuid::Uuid;
 
-use crate::{DType, DValue};
 use crate::fake::Fake;
 use crate::schema::{Column, Schema};
+use crate::{DType, DValue};
 
 // DateTime specifiers https://docs.rs/chrono/0.4.9/chrono/format/strftime/index.html#specifiers
 
@@ -36,6 +37,7 @@ pub fn generate_fake_data(column: Column) -> DValue {
         DType::String => generate_value(column),
         DType::Date => generate_value(column),
         DType::DateTime => generate_value(column),
+        DType::Uuid => generate_value(column),
 
         //Special types
         DType::Age => DValue::Int((1..100).fake()),
@@ -47,7 +49,6 @@ pub fn generate_fake_data(column: Column) -> DValue {
         DType::Longitude => DValue::Str(Longitude().fake()),
     }
 }
-
 
 fn generate_value(column: Column) -> DValue {
     let mut rng = rand::thread_rng();
@@ -70,10 +71,18 @@ fn generate_value(column: Column) -> DValue {
             DType::Double => DValue::Double(str_val.parse::<f64>().unwrap()),
             DType::DateTime => DValue::Date(str_val),
             DType::String => DValue::Str(str_val),
-            _ => panic!("ERROR: Unable to parse provided one_off value {} to the expected data type {:?}", str_val, column.dtype)
+            _ => panic!(
+                "ERROR: Unable to parse provided one_off value {} to the expected data type {:?}",
+                str_val, column.dtype
+            ),
         }
-    } else if column.min.is_some() && column.max.is_some() &&
-        (column.dtype == DType::Int || column.dtype == DType::Long || column.dtype == DType::Float || column.dtype == DType::Double) {
+    } else if column.min.is_some()
+        && column.max.is_some()
+        && (column.dtype == DType::Int
+            || column.dtype == DType::Long
+            || column.dtype == DType::Float
+            || column.dtype == DType::Double)
+    {
         let from: f64 = column.min.unwrap().parse().unwrap();
         let to: f64 = column.max.unwrap().parse().unwrap();
         //println!("{:?} column : ", column);
@@ -82,7 +91,10 @@ fn generate_value(column: Column) -> DValue {
             DType::Long => DValue::Long(rng.gen_range(from, to) as i64),
             DType::Float => DValue::Float(rng.gen_range(from, to) as f32),
             DType::Double => DValue::Double(rng.gen_range(from, to)),
-            _ => panic!("ERROR: Unable to apply range_from and range_to option to the Datatype {:?}", column.dtype)
+            _ => panic!(
+                "ERROR: Unable to apply range_from and range_to option to the Datatype {:?}",
+                column.dtype
+            ),
         }
     } else if column.mean.is_some() && column.std.is_some() {
         let distribution = Normal::new(column.mean.unwrap(), column.std.unwrap()).unwrap();
@@ -91,7 +103,10 @@ fn generate_value(column: Column) -> DValue {
             DType::Long => DValue::Long(distribution.sample(&mut rng) as i64),
             DType::Float => DValue::Float(distribution.sample(&mut rng) as f32),
             DType::Double => DValue::Double(distribution.sample(&mut rng)),
-            _ => panic!("ERROR: Unable to apply mean and std options to the Datatype {:?}", column.dtype)
+            _ => panic!(
+                "ERROR: Unable to apply mean and std options to the Datatype {:?}",
+                column.dtype
+            ),
         }
     } else {
         match column.dtype {
@@ -107,10 +122,27 @@ fn generate_value(column: Column) -> DValue {
                 let date_fmt = column.format.unwrap();
                 let rnd_date: chrono::DateTime<Utc> = {
                     if column.min.is_some() && column.max.is_some() {
-                        let start_dt_naive = NaiveDate::parse_from_str(column.min.unwrap().as_str(), date_fmt.as_str()).unwrap();
-                        let start_dt: chrono::DateTime<Utc> = DateTime::from_utc(NaiveDateTime::new(start_dt_naive, chrono::NaiveTime::from_hms(0, 0, 0)), Utc);
-                        let end_dt_naive = NaiveDate::parse_from_str(column.max.unwrap().as_str(), date_fmt.as_str()).unwrap();
-                        let end_dt: chrono::DateTime<Utc> = DateTime::from_utc(NaiveDateTime::new(end_dt_naive, chrono::NaiveTime::from_hms(0, 0, 0)), Utc);
+                        let start_dt_naive = NaiveDate::parse_from_str(
+                            column.min.unwrap().as_str(),
+                            date_fmt.as_str(),
+                        )
+                        .unwrap();
+                        let start_dt: chrono::DateTime<Utc> = DateTime::from_utc(
+                            NaiveDateTime::new(
+                                start_dt_naive,
+                                chrono::NaiveTime::from_hms(0, 0, 0),
+                            ),
+                            Utc,
+                        );
+                        let end_dt_naive = NaiveDate::parse_from_str(
+                            column.max.unwrap().as_str(),
+                            date_fmt.as_str(),
+                        )
+                        .unwrap();
+                        let end_dt: chrono::DateTime<Utc> = DateTime::from_utc(
+                            NaiveDateTime::new(end_dt_naive, chrono::NaiveTime::from_hms(0, 0, 0)),
+                            Utc,
+                        );
                         DateTimeBetween(start_dt, end_dt).fake()
                     } else {
                         DateTime().fake()
@@ -125,8 +157,12 @@ fn generate_value(column: Column) -> DValue {
                 let date_fmt = column.format.unwrap();
                 let rnd_date: chrono::DateTime<Utc> = {
                     if column.min.is_some() && column.max.is_some() {
-                        let start_dt = Utc.datetime_from_str(column.min.unwrap().as_str(), date_fmt.as_str()).unwrap();
-                        let end_dt = Utc.datetime_from_str(column.max.unwrap().as_str(), date_fmt.as_str()).unwrap();
+                        let start_dt = Utc
+                            .datetime_from_str(column.min.unwrap().as_str(), date_fmt.as_str())
+                            .unwrap();
+                        let end_dt = Utc
+                            .datetime_from_str(column.max.unwrap().as_str(), date_fmt.as_str())
+                            .unwrap();
                         DateTimeBetween(start_dt, end_dt).fake()
                     } else {
                         DateTime().fake()
@@ -135,7 +171,11 @@ fn generate_value(column: Column) -> DValue {
                 DValue::DateTime(rnd_date.format(date_fmt.as_str()).to_string())
             }
             DType::String => DValue::Str(Word().fake()),
-            _ => panic!("Error : The current version does not support one_of for this datatype {:?}", column.dtype)
+            DType::Uuid => DValue::Str(Uuid::new_v4().as_hyphenated().to_string()),
+            _ => panic!(
+                "Error : The current version does not support one_of for this datatype {:?}",
+                column.dtype
+            ),
         }
     }
 }
